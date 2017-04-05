@@ -41,8 +41,7 @@ module Graphics.Rendering.Reflex
     , getNumAttr
     ) where
 
--- from base
-import           Data.List                   (intercalate)
+import qualified Data.Text as T
 #if __GLASGOW_HASKELL__ < 710
 import           Data.Foldable               (foldMap)
 #endif
@@ -65,10 +64,10 @@ import qualified Data.Map as M
 -- import qualified Data.ByteString.Lazy.Char8  as BS8
 
 data Element = Element
-               String
-               (Map String String)
+               T.Text
+               (Map T.Text T.Text)
                [Element]
-  | SvgText String
+  | SvgText T.Text
 
 type RenderM = Reader (Style V2 Double) [Element]
 
@@ -76,9 +75,12 @@ instance Monoid RenderM where
   mempty = return []
   mappend a b = mappend <$> a <*> b
 
-type AttributeValue = String
+type AttributeValue = T.Text
 
-type Attrs = Map String String
+type Attrs = Map T.Text T.Text
+
+showText :: Show a => a -> T.Text
+showText = T.pack . show
 
 getNumAttr :: AttributeClass (a Double) => (a Double -> t) -> Style v Double -> Maybe t
 getNumAttr f = (f <$>) . getAttr
@@ -94,7 +96,7 @@ renderPath trs
 
 renderTrail :: Located (Trail V2 Double) -> AttributeValue
 renderTrail (viewLoc -> (P (V2 x y), t)) =
-  concat [ "M " , show x, ",",  show y, " " ]
+  T.concat [ "M " , showText x, ",", showText y, " " ]
   <> withTrail renderLine renderLoop t
   where
     renderLine = foldMap renderSeg . lineSegments
@@ -108,15 +110,15 @@ renderTrail (viewLoc -> (P (V2 x y), t)) =
       <> "Z"
 
 renderSeg :: Segment Closed V2 Double -> AttributeValue
-renderSeg (Linear (OffsetClosed (V2 x 0))) = concat [ "h ", show x, " "]
-renderSeg (Linear (OffsetClosed (V2 0 y))) = concat [ "v ", show y, " " ]
-renderSeg (Linear (OffsetClosed (V2 x y))) = concat [ "l ", show x, ",", show y, " "]
+renderSeg (Linear (OffsetClosed (V2 x 0))) = T.concat [ "h ", showText x, " "]
+renderSeg (Linear (OffsetClosed (V2 0 y))) = T.concat [ "v ", showText y, " " ]
+renderSeg (Linear (OffsetClosed (V2 x y))) = T.concat [ "l ", showText x, ",", showText y, " "]
 renderSeg (Cubic  (V2 x0 y0) (V2 x1 y1) (OffsetClosed (V2 x2 y2))) =
-  concat [ " c ", show x0, ",", show y0, " ", show x1, ",", show y1
-         , " ", show x2, " ", show y2]
+  T.concat [ " c ", showText x0, ",", showText y0, " ", showText x1, ",", showText y1
+         , " ", showText x2, " ", showText y2]
 
 renderText :: Text Double -> RenderM
-renderText (Text tt tAlign str) = return [ Element "text" attrs [ SvgText str ] ]
+renderText (Text tt tAlign str) = return [ Element "text" attrs [ SvgText $ T.pack str ] ]
   where
    attrs = M.fromList
      [ ("transform", transformMatrix)
@@ -141,10 +143,10 @@ renderText (Text tt tAlign str) = return [ Element "text" attrs [ SvgText str ] 
    transformMatrix     = matrix a b c d e f
 
 -- | Specifies a transform in the form of a transformation matrix
-matrix :: (Show a, RealFloat a) =>  a -> a -> a -> a -> a -> a -> String
-matrix a b c d e f =  concat
-  [ "matrix(", show a, ",", show b, ",",  show c
-  , ",",  show d, ",", show e, ",",  show f, ")"]
+matrix :: (Show a, RealFloat a) =>  a -> a -> a -> a -> a -> a -> T.Text
+matrix a b c d e f =  T.concat
+  [ "matrix(", showText a, ",", showText b, ",",  showText c
+  , ",",  showText d, ",", showText e, ",",  showText f, ")"]
 
 renderStyles :: Style v Double -> Attrs
 renderStyles s = foldMap ($ s) $
@@ -205,7 +207,7 @@ renderDashing s = renderTextAttr "stroke-dasharray" arr <>
  where
   getDasharray  (Dashing a _) = a
   getDashoffset (Dashing _ o) = o
-  dashArrayToStr              = intercalate "," . map show
+  dashArrayToStr              = T.intercalate "," . map showText
   -- Ignore dashing if dashing array is empty
   checkEmpty (Just (Dashing [] _)) = Nothing
   checkEmpty other                 = other
@@ -216,7 +218,7 @@ renderDashing s = renderTextAttr "stroke-dasharray" arr <>
 renderFontSize :: Style v Double -> Attrs
 renderFontSize s = renderTextAttr "font-size" fs
  where
-  fs = getNumAttr ((++ "px") . show . getFontSize) s
+  fs = getNumAttr ((<> "px") . showText . getFontSize) s
 
 renderFontSlant :: Style v Double -> Attrs
 renderFontSlant s = renderTextAttr "font-style" fs
@@ -238,13 +240,13 @@ renderFontWeight s = renderTextAttr "font-weight" fw
 renderFontFamily :: Style v Double -> Attrs
 renderFontFamily s = renderTextAttr  "font-family" ff
  where
-  ff = (getFont) <$> getAttr s
+  ff = (T.pack . getFont) <$> getAttr s
 
 -- | Render a style attribute if available, empty otherwise.
-renderAttr :: Show s => String -> Maybe s -> Attrs
-renderAttr attrName valM = maybe mempty (\v -> M.singleton attrName $ show v) valM
+renderAttr :: Show s => T.Text -> Maybe s -> Attrs
+renderAttr attrName valM = maybe mempty (\v -> M.singleton attrName $ showText v) valM
 
-renderTextAttr :: String -> Maybe AttributeValue -> Attrs
+renderTextAttr :: T.Text -> Maybe AttributeValue -> Attrs
 renderTextAttr attrName valM = maybe mempty (\v -> M.singleton attrName v) valM
 
 -- TODO add gradients
@@ -267,17 +269,17 @@ renderLineTexture s = case getNumAttr getLineTexture s of
       lineColorOpacity = colorToOpacity c
   _ -> mempty
 
-colorToRgbString :: forall c . Color c => c -> String
-colorToRgbString c = concat
+colorToRgbString :: forall c . Color c => c -> T.Text
+colorToRgbString c = T.concat
   [ "rgb("
   , int r, ","
   , int g, ","
   , int b
   , ")" ]
  where
-   int d     = show $ (round (d * 255) :: Int)
+   int d     = showText $ (round (d * 255) :: Int)
    (r,g,b,_) = colorToSRGBA c
 
-colorToOpacity :: forall c . Color c => c -> String
-colorToOpacity c = show a
+colorToOpacity :: forall c . Color c => c -> T.Text
+colorToOpacity c = showText a
  where (_,_,_,a) = colorToSRGBA c

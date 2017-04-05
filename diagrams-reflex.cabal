@@ -1,5 +1,5 @@
 Name:                diagrams-reflex
-Version:             0.1
+Version:             0.2
 Synopsis:            reflex backend for diagrams drawing EDSL.
 Homepage:            http://projects.haskell.org/diagrams/
 License:             BSD3
@@ -29,9 +29,10 @@ Library
                      , diagrams-core        >= 1.3   && < 1.4
                      , diagrams-lib         >= 1.3   && < 1.4
                      , monoid-extras        >= 0.3   && < 0.5
-                     , reflex-dom            >= 0.2   && < 0.4
-                     , reflex >= 0.3 && < 0.5
-                     , reflex-dom-contrib >= 0.4 && < 0.5
+                     , reflex-dom            >= 0.3   && < 0.5
+                     , reflex >= 0.5 && < 0.6
+                     , reflex-dom-contrib >= 0.5 && < 0.6
+                     , text
                      , containers           >= 0.3   && < 0.6
                      , lens                 >= 4.0   && < 4.15
 
