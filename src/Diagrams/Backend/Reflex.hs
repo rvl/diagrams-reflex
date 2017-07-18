@@ -44,6 +44,8 @@ import           Data.Foldable            as F (foldMap)
 #endif
 import           Data.Tree
 
+import qualified Data.Text as T
+
 -- from base
 import           Control.Monad.Reader
 
@@ -63,9 +65,11 @@ import           Diagrams.TwoD.Text (Text(..))
 import qualified Data.Map as M
 
 -- from reflex
-import Reflex
+{-import Reflex-}
 
 -- from reflex-dom
+{-import Reflex.Dom (MonadWidget, Event, EventResultType, EventName)-}
+import Reflex.Dom hiding (Element)
 import Reflex.Dom.Class
 import Reflex.Dom.Widget.Basic
 
@@ -73,7 +77,7 @@ import Reflex.Dom.Widget.Basic
 import Reflex.Dom.Contrib.Widgets.Svg
 
 -- from this package
-import           Graphics.Rendering.Reflex   (Element(..), RenderM)
+{-import           Graphics.Rendering.Reflex   (Element(..), RenderM)-}
 import qualified Graphics.Rendering.Reflex   as R
 
 -- | @ReflexSvg@ is simply a token used to identify this rendering backend
@@ -91,8 +95,8 @@ instance Monoid (Render ReflexSvg V2 Double) where
   Render r1 `mappend` Render r2_ = Render $ mappend r1 r2_
 
 instance Backend ReflexSvg V2 Double where
-  newtype Render  ReflexSvg V2 Double = Render RenderM
-  type    Result  ReflexSvg V2 Double = Element
+  newtype Render  ReflexSvg V2 Double = Render R.RenderM
+  type    Result  ReflexSvg V2 Double = R.Element
   data    Options ReflexSvg V2 Double = ReflexOptions
     { _size            :: SizeSpec V2 Double   -- ^ The requested size.
     , _svgAttributes   :: R.Attrs
@@ -100,9 +104,9 @@ instance Backend ReflexSvg V2 Double where
     }
 
   renderRTree :: ReflexSvg -> Options ReflexSvg V2 Double -> RTree ReflexSvg V2 Double Annotation -> Result ReflexSvg V2 Double
-  renderRTree _ opts rt = Element "svg" attrs $ runReader (rtree rt) mempty
+  renderRTree _ opts rt = R.Element "svg" attrs $ runReader (rtree rt) mempty
     where
-      rtree :: RTree ReflexSvg V2 Double Annotation -> RenderM
+      rtree :: RTree ReflexSvg V2 Double Annotation -> R.RenderM
       rtree (Node n rs) = case n of
         RPrim p                 -> unRender $ render ReflexSvg p
         RStyle sty              -> local (<> sty) r
@@ -110,8 +114,8 @@ instance Backend ReflexSvg V2 Double where
         where
           r = foldMap rtree rs
       V2 w h = specToSize 100 . view sizeSpec $ opts
-      attrs = M.fromList [ ("width", show w)
-                       , ("height", show h) ]
+      attrs = M.fromList [ ("width", T.pack $ show w)
+                       , ("height", T.pack $ show h) ]
               <> _svgAttributes opts
 
   adjustDia c opts d = ( sz, t <> reflectionY, d' ) where
@@ -127,11 +131,11 @@ svgAttributes :: Lens' (Options ReflexSvg V2 Double) R.Attrs
 svgAttributes f opts =
   f (_svgAttributes opts) <&> \ds -> opts { _svgAttributes = ds }
 
-mkWidget :: forall t m. MonadWidget t m => Element -> m ()
-mkWidget (Element name attrs children) = svgAttr name attrs (mapM_ mkWidget children)
-mkWidget (SvgText str) = text str
+mkWidget :: forall t m. MonadWidget t m => R.Element -> m ()
+mkWidget (R.Element name attrs children) = svgAttr name attrs (mapM_ mkWidget children)
+mkWidget (R.SvgText str) = text str
 
-unRender :: Render ReflexSvg V2 Double -> RenderM
+unRender :: Render ReflexSvg V2 Double -> R.RenderM
 unRender (Render els) = els
 
 instance Renderable (Path V2 Double) ReflexSvg where
@@ -156,7 +160,7 @@ reflexDia :: forall t m a. (Monoid' a, MonadWidget t m) =>
              Options ReflexSvg V2 Double -> QDiagram ReflexSvg V2 Double a -> m (DiaEv t a)
 reflexDia opts dia = do
   -- render SVG, get stream with al events
-  let (t, (Element n as cs)) = renderDiaT ReflexSvg opts dia
+  let (t, (R.Element n as cs)) = renderDiaT ReflexSvg opts dia
   (allEvents, _) <- svgAttr' n as $ mapM_ mkWidget cs
   -- particular event streams
   let
