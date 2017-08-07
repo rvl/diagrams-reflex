@@ -114,8 +114,7 @@ instance Backend ReflexSvg V2 Double where
         where
           r = foldMap rtree rs
       V2 w h = specToSize 100 . view sizeSpec $ opts
-      attrs = M.fromList [ ("width", T.pack $ show w)
-                       , ("height", T.pack $ show h) ]
+      attrs = ("viewBox" =: ("0 0 " <> (T.pack $ show w) <> " " <> (T.pack $ show h)))
               <> _svgAttributes opts
 
   adjustDia c opts d = ( sz, t <> reflectionY, d' ) where
